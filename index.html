@@ -259,6 +259,19 @@ table.g2{border-collapse:separate;border-spacing:0;width:max-content;min-width:1
 .dc tr.cur td{box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--accent) 12%,transparent)}
 .dc td.who{min-width:0}.dc .ord{width:34px;color:var(--muted);font-family:var(--mono);text-align:center}
 .own{font-size:12px}
+
+.ownm{display:none;font-size:11.5px;line-height:1.2}
+@media(max-width:700px){
+  .dc th:last-child,.dc td:last-child{display:none}
+  .dc .ownm{display:block}
+  .dc th.num{width:52px}.dc th.ord{width:30px}
+  .dc table{font-size:13px}.dc th,.dc td{padding:8px 4px}
+  .dc td.who{gap:8px;white-space:normal;min-width:0}.dc td.who .face{width:30px;height:30px}
+  .dc td.who>span{min-width:0;line-height:1.25}
+  .dc td.num{font-size:12.5px}
+  .pp-b{padding:14px 12px 28px}
+  .dc h3{margin:16px 0 6px}
+}
 </style>
 </head>
 <body>
@@ -758,7 +771,7 @@ function rosterTab(id,p){
   });
   if(!secs.length) return `<p class="small muted">No depth chart data for ${esc(team)}.</p>`;
   const tbl=([pos,ids])=>`<h3>${{QB:'Quarterbacks',RB:'Running backs',WR:'Wide receivers',TE:'Tight ends',K:'Kicker'}[pos]}</h3><div class="tw"><table><thead><tr><th class="ord">#</th><th>Player</th><th class="num">Proj/g</th><th class="num">Avg</th><th class="num">Snp%</th><th>Owner</th></tr></thead><tbody>
-    ${ids.map((i,n)=>{ const q=ensureP(i), sn=avgSnap(i), o=own[i]; return `<tr data-rp="${i}" class="${i===id?'cur':''}"><td class="ord">${PL[i].dc!=null?PL[i].dc:'–'}</td><td class="who">${face(i,pos)}<span>${esc(PL[i].n)}${PL[i].inj?` <span class="inj">${esc(PL[i].inj)}</span>`:''}${PL[i].status&&PL[i].status!=='Active'?` <span class="muted small">${esc(PL[i].status)}</span>`:''}</span></td>
+    ${ids.map((i,n)=>{ const q=ensureP(i), sn=avgSnap(i), o=own[i]; return `<tr data-rp="${i}" class="${i===id?'cur':''}"><td class="ord">${PL[i].dc!=null?PL[i].dc:'–'}</td><td class="who">${face(i,pos)}<span>${esc(PL[i].n)}${PL[i].inj?` <span class="inj">${esc(PL[i].inj)}</span>`:''}${PL[i].status&&PL[i].status!=='Active'?` <span class="muted small">${esc(PL[i].status)}</span>`:''}<span class="ownm ${o&&o.id===state.me?'good':'muted'}">${o?esc(o.owner):'Free agent'}</span></span></td>
       <td class="num">${q&&q.use?q.use.toFixed(1):'–'}</td><td class="num">${q&&q.act?q.act.toFixed(1):'–'}</td><td class="num">${sn!=null?Math.round(sn):'–'}</td><td class="own ${o&&o.id===state.me?'good':'muted'}">${o?esc(o.owner):'Free agent'}</td></tr>`; }).join('')}</tbody></table></div>`;
   return `<div class="dc"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><img class="face" src="${faceUrl(team,'DEF')}" alt="" onerror="this.style.visibility='hidden'"><div><b style="font-size:16px">${esc(team)} depth chart</b><div class="small muted">Order comes from Sleeper's depth chart. Click a player to open his game log.</div></div></div>${secs.map(tbl).join('')}</div>`;
 }
