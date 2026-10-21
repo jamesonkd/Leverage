@@ -299,7 +299,10 @@ $('theme').onclick = ()=>{
 };
 $('me').onchange = e=>{ state.me=+e.target.value; state.give.clear(); state.get.clear(); state.partner=null; renderAll(); };
 $('hz').onchange = e=>{ state.hz=e.target.value; renderAll(); };
-$('basis').onchange = e=>{ state.basis=e.target.value; applyBasis(); renderAll(); };
+function basisNote(){ const n=Object.values(P).filter(p=>p.act>0).length, el=$('asof'); if(!el.dataset.base) return;
+  const lead = state.basis==='blend' ? (n? ` · season averages loaded for ${n} players` : ' · <b style="color:#ffd27f">no season averages available, so Proj + season changes nothing</b>') : '';
+  el.innerHTML = el.dataset.base + lead; }
+$('basis').onchange = e=>{ state.basis=e.target.value; applyBasis(); renderAll(); basisNote(); };
 
 
 /* ---------- playoff odds (Monte Carlo) ---------- */
@@ -607,6 +610,11 @@ async function weekProjections(season,w){
   const q=FANTASY_POS.map(p=>'position[]='+p).join('&');
   try{ const rows=await getJSON(`${SLP}/${season}/${w}?season_type=regular&${q}&order_by=pts_ppr`); const m={}; for(const r of rows){ const v=r.stats&&r.stats.pts_ppr; if(v!=null) m[r.player_id]=v; } return m; }catch(e){ return null; }
 }
+async function weekStats(season,w){
+  const q=FANTASY_POS.map(p=>'position[]='+p).join('&');
+  try{ const rows=await getJSON(`https://api.sleeper.com/stats/nfl/${season}/${w}?season_type=regular&${q}&order_by=pts_ppr`); const m={}; let n=0;
+    for(const r of rows){ const st=r.stats||{}; if(st.pts_ppr==null) continue; if(st.gp!==undefined && !(st.gp>0)) continue; m[r.player_id]=st.pts_ppr; n++; } return n? m : null; }catch(e){ return null; }
+}
 async function marketValues(){
   try{ const rows=await getJSON('https://api.fantasycalc.com/values/current?isDynasty=false&numQbs=1&numTeams=12&ppr=1'); const m={}; FCT={};
     for(const r of rows){ const id=r.sleeperId||(r.player&&r.player.sleeperId); if(id){ m[id]=r.value; const t=r.trend30Day??(r.player&&r.player.trend30Day); if(typeof t==='number') FCT[id]=t; } } if(Object.keys(m).length>50) return m; }catch(e){} return null;
@@ -616,9 +624,10 @@ async function loadLive(){
   const season=st.season||new Date().getFullYear(), startWk=st.season_type==='regular'?Math.max(1,Math.min(17,st.week||1)):1;
   WEEKS=[]; for(let w=startWk;w<=17;w++) WEEKS.push(w);
   const past=[]; for(let w=1;w<startWk;w++) past.push(w);
-  const [projs,fc,played,future]=await Promise.all([Promise.all(WEEKS.map(w=>weekProjections(season,w))),marketValues(),
+  const [projs,fc,played,future,sts]=await Promise.all([Promise.all(WEEKS.map(w=>weekProjections(season,w))),marketValues(),
     Promise.all(past.map(w=>getJSON(`${SL}/league/${LEAGUE_ID}/matchups/${w}`).catch(()=>null))),
-    Promise.all(WEEKS.filter(w=>w<=LAST_REG_WEEK).map(w=>getJSON(`${SL}/league/${LEAGUE_ID}/matchups/${w}`).catch(()=>null)))]);
+    Promise.all(WEEKS.filter(w=>w<=LAST_REG_WEEK).map(w=>getJSON(`${SL}/league/${LEAGUE_ID}/matchups/${w}`).catch(()=>null))),
+    Promise.all(past.map(w=>weekStats(season,w)))]);
   SCHED={};
   const schedWeeks=past.concat(WEEKS.filter(w=>w<=LAST_REG_WEEK)), schedData=played.concat(future);
   schedWeeks.forEach((w,i)=>{ const m=schedData[i]; if(!m) return; const grp={}; m.forEach(x=>{ if(x.matchup_id!=null) (grp[x.matchup_id]=grp[x.matchup_id]||[]).push(x.roster_id); });
@@ -626,6 +635,7 @@ async function loadLive(){
   const got=projs.filter(Boolean).length; if(!got) throw new Error('No projections returned');
   const actual={};
   for(const wk of played){ if(!wk) continue; for(const m of wk){ const pp=m.players_points||{}; for(const id in pp){ if(pp[id]!=null&&pp[id]!==0) (actual[id]=actual[id]||[]).push(pp[id]); } } }
+  const act2={}; sts.forEach(m=>{ if(m) for(const id in m) (act2[id]=act2[id]||[]).push(m[id]); });
   const uname={}; users.forEach(u=>uname[u.user_id]=u.display_name||u.username);
   TEAMS=rosters.map(r=>({id:r.roster_id,owner:uname[r.owner_id]||('Team '+r.roster_id),w:(r.settings||{}).wins||0,l:(r.settings||{}).losses||0,t:(r.settings||{}).ties||0,pf:((r.settings||{}).fpts||0)+((r.settings||{}).fpts_decimal||0)/100,roster:(r.players||[]).filter(id=>id!=='0')}));
   P={}; const rostered=new Set();
@@ -633,8 +643,8 @@ async function loadLive(){
   const avgOf = a => { const x=a.filter(v=>v>0); return x.length? x.reduce((s,v)=>s+v,0)/x.length : 0; };
   for(const t of TEAMS) for(const id of t.roster){
     rostered.add(id);
-    const base=nameMap[id]||{n:'Player '+id,pos:/^[A-Z]{2,3}$/.test(id)?'DEF':'RB',nfl:'',inj:''}, wk=weekly(id), gp=(actual[id]||[]).length;
-    P[id]={...base,wk,avg:avgOf(wk),act:gp?actual[id].reduce((a,b)=>a+b,0)/gp:0,gp};
+    const base=nameMap[id]||{n:'Player '+id,pos:/^[A-Z]{2,3}$/.test(id)?'DEF':'RB',nfl:'',inj:''}, wk=weekly(id), A=(act2[id]&&act2[id].length)?act2[id]:(actual[id]||[]), gp=A.length;
+    P[id]={...base,wk,avg:avgOf(wk),act:gp?A.reduce((a,b)=>a+b,0)/gp:0,gp};
   }
   // free agents: anyone with a projection who is not on a roster
   FA=[]; const ids=new Set(); projs.forEach(m=>{ if(m) for(const id in m) ids.add(id); });
@@ -655,7 +665,7 @@ function finishLoad(){
   if(!byId[state.me]) state.me=mine.id;
   $('me').innerHTML=TEAMS.map(t=>`<option value="${t.id}">${esc(t.owner)}</option>`).join(''); $('me').value=state.me;
   state.give.clear(); state.get.clear(); state.partner=null;
-  $('asof').textContent=(SOURCE.live?'Live from Sleeper, '+SOURCE.when.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' · week '+SOURCE.week:'Offline snapshot, '+SOURCE.when)+` · horizon weeks ${WEEKS[0]}–${WEEKS[WEEKS.length-1]} · 12-team full PPR · trade deadline week ${D.deadline}`;
+  $('asof').dataset.base=esc((SOURCE.live?'Live from Sleeper, '+SOURCE.when.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+' · week '+SOURCE.week:'Offline snapshot, '+SOURCE.when)+` · horizon weeks ${WEEKS[0]}–${WEEKS[WEEKS.length-1]} · 12-team full PPR · trade deadline week ${D.deadline}`); basisNote();
   $('foot').textContent=SOURCE.live
     ? `Projections come from Sleeper (${SOURCE.weeksLoaded} of ${WEEKS.length} remaining weeks loaded; a bye or missing projection counts as 0). Market value is ${SOURCE.fcLive?'FantasyCalc redraft, live':'a FantasyCalc snapshot from Oct 17'}, and players outside its top 100 count as 300. Injury tags come from Sleeper and do not change projections. Lineup: QB, 2 RB, 2 WR, TE, FLEX, K, DEF.`
     : 'Could not reach Sleeper from this browser, so this is a saved snapshot from Oct 17 using two-week average projections. Press Refresh to try again.';
