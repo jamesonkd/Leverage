@@ -698,7 +698,7 @@ let ppLast=null, ppTab='overview';
 
 function seasonRanks(){
   const key=Object.keys(STATS).join(','); if(RANKC&&RANKC.key===key) return RANKC;
-  const tot={}, pos={}, gps={}; for(const w in STATS){ if(+w===CURWK) continue; for(const id in STATS[w]){ const g=STATS[w][id]; tot[id]=(tot[id]||0)+g.pts; gps[id]=(gps[id]||0)+1; if(g.pos) pos[id]=g.pos; } }
+  const tot={}, pos={}, gps={}; for(const w in STATS){ for(const id in STATS[w]){ const g=STATS[w][id]; tot[id]=(tot[id]||0)+g.pts; gps[id]=(gps[id]||0)+1; if(g.pos) pos[id]=g.pos; } }
   const ids=Object.keys(tot); const byPos={}, all=[];
   ids.forEach(id=>{ const ps=pos[id]||(P[id]&&P[id].pos); if(!ps) return; (byPos[ps]=byPos[ps]||[]).push(id); if(['QB','RB','WR','TE'].includes(ps)) all.push(id); });
   const r={key,tot,gps,pos:{},overall:{}}; for(const ps in byPos){ byPos[ps].sort((a,b)=>tot[b]-tot[a]).forEach((id,i)=>r.pos[id]=i+1); } all.sort((a,b)=>tot[b]-tot[a]).forEach((id,i)=>r.overall[id]=i+1);
