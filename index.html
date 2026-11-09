@@ -856,7 +856,7 @@ async function loadLive(){
   const actual={};
   for(const wk of played){ if(!wk) continue; for(const m of wk){ const pp=m.players_points||{}; for(const id in pp){ if(pp[id]!=null&&pp[id]!==0) (actual[id]=actual[id]||[]).push(pp[id]); } } }
   CURWK = curWk ? startWk : null;
-  const act2={}; sts.forEach(m=>{ if(m) for(const id in m) (act2[id]=act2[id]||[]).push(m[id]); });
+  const act2={}; sts.concat(curWk?[curWk]:[]).forEach(m=>{ if(m) for(const id in m) (act2[id]=act2[id]||[]).push(m[id]); });
   const uname={}; users.forEach(u=>uname[u.user_id]=u.display_name||u.username);
   TEAMS=rosters.map(r=>({id:r.roster_id,owner:uname[r.owner_id]||('Team '+r.roster_id),w:(r.settings||{}).wins||0,l:(r.settings||{}).losses||0,t:(r.settings||{}).ties||0,pf:((r.settings||{}).fpts||0)+((r.settings||{}).fpts_decimal||0)/100,roster:(r.players||[]).filter(id=>id!=='0')}));
   P={}; const rostered=new Set();
